@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>OpoCnpTdah</title>
+  
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <meta name="theme-color" content="#f5efe6">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  
+  <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.3/dist/tesseract.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
+  
+  <style>
+    :root {
+      --bg-main: #f5efe6;
+      --bg-card: #ebd9c8;
+      --bg-card-hover: #e2cca6;
+      --accent-primary: #8c6d53;
+      --accent-secondary: #6b4f3a;
+      --text-dark: #2c221e;
+      --text-muted: #6b5d52;
+      --border-color: #d6c0a9;
+      --correct: #4a7c59;
+      --wrong: #b84a39;
+      --radius-lg: 18px;
+      --radius-md: 12px;
+      --font-main: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font-main); -webkit-tap-highlight-color: transparent; }
+    body { background-color: var(--bg-main); color: var(--text-dark); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+    header {
+      background: var(--bg-card);
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .brand-title { font-size: 1.3rem; font-weight: 800; color: var(--accent-secondary); letter-spacing: -0.5px; }
+
+    main { flex: 1; overflow-y: auto; padding: 16px; padding-bottom: 90px; }
+
+    .nav-tabs {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: var(--bg-card);
+      display: flex; justify-content: space-around;
+      padding: 12px 0 20px 0;
+      border-top: 1px solid var(--border-color);
+      box-shadow: 0 -4px 12px rgba(0,0,0,0.03);
+      z-index: 100;
+    }
+    .nav-item {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 4px; color: var(--text-muted); text-decoration: none; font-size: 0.75rem; font-weight: 600;
+      background: none; border: none; cursor: pointer; flex: 1;
+    }
+    .nav-item.active { color: var(--accent-secondary); }
+
+    .card {
+      background: var(--bg-card);
+      border-radius: var(--radius-lg);
+      padding: 18px;
+      margin-bottom: 14px;
+      border: 1px solid var(--border-color);
+    }
+
+    .btn {
+      background: var(--accent-primary); color: white;
+      border: none; padding: 12px 18px; border-radius: var(--radius-md);
+      font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; justify-content: center;
+      width: 100%; transition: background 0.2s;
+    }
+    .btn:active { background: var(--accent-secondary); }
+
+    .flashcard {
+      min-height: 220px; background: white; border-radius: var(--radius-lg);
+      display: flex; flex-direction: column; justify-content: center; align-items: center;
+      text-align: center; padding: 24px; border: 2px solid var(--border-color);
+      cursor: pointer; position: relative; box-shadow: 0 4px 10px rgba(0,0,0,0.02);
+      transition: transform 0.15s ease;
+    }
+    .flashcard:active {
+      transform: scale(0.99);
+    }
+
+    .option-btn {
+      background: white; border: 1px solid var(--border-color); padding: 14px;
+      border-radius: var(--radius-md); margin-bottom: 8px; text-align: left;
+      font-weight: 500; width: 100%; cursor: pointer; color: var(--text-dark);
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    .option-btn.selected-correct { background: #e2f0d9 !important; border-color: var(--correct) !important; color: var(--correct) !important; font-weight: 700; }
+    .option-btn.selected-wrong { background: #fce4d6 !important; border-color: var(--wrong) !important; color: var(--wrong) !important; font-weight: 700; }
+
+    .hidden { display: none !important; }
+    input[type="file"], select, input[type="text"] {
+      width: 100%; padding: 12px; border-radius: var(--radius-md);
+      border: 1px solid var(--border-color); background: white; margin-bottom: 12px;
+      color: var(--text-dark); font-size: 0.95rem;
+    }
+    input::placeholder { color: #a39082; }
+
+    .topic-item {
+      display: flex; justify-content: space-between; align-items: center;
+      background: white; padding: 14px; border-radius: var(--radius-md);
+      border: 1px solid var(--border-color); margin-bottom: 8px;
+    }
+    .delete-btn {
+      background: transparent; border: none; color: var(--wrong);
+      cursor: pointer; padding: 4px; display: inline-flex; align-items: center;
+    }
+
+    .badge-adhd {
+      display: inline-block; background: #e2cca6; color: var(--accent-secondary);
+      font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 10px;
+      margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .exam-stat-pill {
+      background: white; padding: 8px 12px; border-radius: var(--radius-md);
+      border: 1px solid var(--border-color); font-size: 0.8rem; font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand-title">OpoCnpTdah 👮‍♂️</div>
+    <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;" id="user-stats">0 tarj. repasadas</div>
+  </header>
+
+  <main id="app-content">
+    <!-- Vista Temario -->
+    <section id="view-temario">
+      <div class="card">
+        <span class="badge-adhd">Modo Estudio TDAH</span>
+        <h3>Subir Material de Estudio</h3>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">PDFs, imágenes de esquemas o documentos Word</p>
+        <input type="text" id="topic-title" placeholder="Nombre del tema (ej. Tema 1: La Constitución)">
+        <input type="file" id="file-input" accept=".pdf,.docx,image/*">
+        <button class="btn" onclick="saveTopic()"><i data-lucide="upload"></i> Guardar en Temario</button>
+      </div>
+
+      <h3 style="margin: 16px 0 8px 0;">Mis Temas de Oposición</h3>
+      <div id="topics-list"></div>
+    </section>
+
+    <!-- Vista Flashcards -->
+    <section id="view-cards" class="hidden">
+      <div class="card">
+        <h3>Añadir Flashcard Rápida</h3>
+        <input type="text" id="fc-q" placeholder="Pregunta / Concepto">
+        <input type="text" id="fc-a" placeholder="Respuesta / Artículo">
+        <button class="btn" onclick="addFlashcard()"><i data-lucide="plus"></i> Crear Tarjeta</button>
+      </div>
+
+      <div id="flashcard-container" class="hidden">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);" id="card-counter">Tarjeta 1 de 1</span>
+          <span style="font-size: 0.75rem; color: var(--accent-primary); font-weight: 700;" id="card-interval-badge">Intervalo: 1 día</span>
+        </div>
+        <div class="flashcard" onclick="flipCard()">
+          <div style="font-size: 0.75rem; color: var(--text-muted); position: absolute; top: 12px; right: 12px;">
+            <i data-lucide="rotate-ccw" style="width: 16px; height: 16px;"></i> Toca para girar
+          </div>
+          <div id="fc-content" style="font-size: 1.1rem; font-weight: 600; line-height: 1.4;">Toca para voltear</div>
+        </div>
+        <div style="display: flex; gap: 8px; margin-top: 14px;" id="fc-controls" class="hidden">
+          <button class="btn" style="background: var(--wrong);" onclick="gradeCard(1)">Difícil</button>
+          <button class="btn" style="background: var(--accent-primary);" onclick="gradeCard(2)">Bien</button>
+          <button class="btn" style="background: var(--correct);" onclick="gradeCard(3)">Fácil</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Vista Examen -->
+    <section id="view-exam" class="hidden">
+      <div class="card" id="exam-setup">
+        <span class="badge-adhd">Simulacro Oficial CNP</span>
+        <h3>Simulacro de Examen CNP</h3>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">3 Opciones por pregunta (-0.5 error). Estilo oficial.</p>
+        <button class="btn" onclick="startExam()"><i data-lucide="play"></i> Iniciar Examen</button>
+      </div>
+      <div id="exam-container" class="hidden"></div>
+    </section>
+  </main>
+
+  <nav class="nav-tabs">
+    <button class="nav-item active" onclick="switchTab('temario', event)"><i data-lucide="book-open"></i>Temario</button>
+    <button class="nav-item" onclick="switchTab('cards', event)"><i data-lucide="layers"></i>Flashcards</button>
+    <button class="nav-item" onclick="switchTab('exam', event)"><i data-lucide="file-check"></i>Examen</button>
+  </nav>
+
+  <script>
+    // Inicializar iconos Lucide
+    function refreshIcons() {
+      if (window.lucide && typeof lucide.createIcons === 'function') {
+        lucide.createIcons();
+      }
+    }
+
+    // Datos iniciales precargados (Temas y Flashcards CNP)
+    const DEFAULT_CARDS = [
+      { id: 1, q: "Art. 104 CE: ¿Cuál es la misión principal de las Fuerzas y Cuerpos de Seguridad?", a: "Proteger el libre ejercicio de los derechos y libertades y garantizar la seguridad ciudadana.", interval: 1 },
+      { id: 2, q: "¿Cuál es el plazo máximo de la detención preventiva con carácter general (Art. 17 CE)?", a: "El tiempo estrictamente necesario, y como máximo 72 horas para puesta a disposición judicial o libertad.", interval: 1 },
+      { id: 3, q: "LO 2/1986: ¿De quién dependen las Fuerzas y Cuerpos de Seguridad del Estado?", a: "Del Ministerio del Interior (a través de la Secretaría de Estado de Seguridad).", interval: 1 },
+      { id: 4, q: "¿Cuáles son las cuatro escalas del Cuerpo Nacional de Policía?", a: "Escala Superior, Escala Ejecutiva, Escala de Subinspección y Escala Básica.", interval: 1 },
+      { id: 5, q: "Art. 520 LECrim: ¿A qué tiene derecho el detenido de forma irrenunciable?", a: "Derecho a ser informado de sus derechos y razones de detención, y asistencia letrada.", interval: 1 }
+    ];
+
+    const DEFAULT_TOPICS = [
+      { id: 1, title: "Tema 1: La Constitución Española de 1978", fileName: "Esquema_Constitucion.pdf" },
+      { id: 2, title: "Tema 12: LO 2/1986 de Fuerzas y Cuerpos de Seguridad", fileName: "Resumen_LO_2_1986.docx" }
+    ];
+
+    // Banco de preguntas oficiales CNP
+    const OFFICIAL_QUESTIONS = [
+      {
+        question: "¿Según el artículo 104 de la Constitución Española, qué cuerpo o cuerpos tienen como misión garantizar la seguridad ciudadana?",
+        options: [
+          "Las Fuerzas Armadas bajo el mando del Rey",
+          "Las Fuerzas y Cuerpos de Seguridad bajo la dependencia del Gobierno",
+          "Únicamente los Cuerpos de Policía Local de cada municipio"
+        ],
+        correct: 1,
+        explanation: "El Art. 104.1 CE establece que las Fuerzas y Cuerpos de Seguridad, bajo la dependencia del Gobierno, tendrán como misión proteger el libre ejercicio de los derechos y garantizar la seguridad ciudadana."
+      },
+      {
+        question: "De acuerdo con el artículo 17 de la Constitución Española, el plazo máximo de la detención preventiva es de:",
+        options: [
+          "48 horas improrrogables",
+          "72 horas, plazo en el que el detenido debe ser puesto en libertad o a disposición judicial",
+          "24 horas salvo en delitos de terrorismo"
+        ],
+        correct: 1,
+        explanation: "El Art. 17.2 CE fija el límite máximo en setenta y dos horas para la puesta a disposición judicial o liberación del detenido."
+      },
+      {
+        question: "Según la LO 2/1986, en el Cuerpo Nacional de Policía, ¿a qué escala pertenece la categoría de Inspector Jefe?",
+        options: [
+          "A la Escala Superior",
+          "A la Escala Ejecutiva",
+          "A la Escala de Subinspección"
+        ],
+        correct: 1,
+        explanation: "La Escala Ejecutiva integra las categorías de Inspector e Inspector Jefe."
+      },
+      {
+        question: "El principio básico de actuación policial relativo a la 'jerarquía y subordinación' exige:",
+        options: [
+          "Cumplir en todo caso cualquier orden sin excepción",
+          "Obediencia a los mandos, no debiendo ejecutar órdenes que entrañen la ejecución de actos que manifiestamente constituyan delito",
+          "Someter todas las actuaciones policiales a votación del equipo"
+        ],
+        correct: 1,
+        explanation: "Art. 5.1.d LO 2/1986: En ningún caso las órdenes que entrañen la comisión de actos delictivos o contrarios a las leyes ampararán la actuación de los miembros de los FCS."
+      },
+      {
+        question: "¿Cuál de las siguientes autoridades puede ordenar el procedimiento de 'Habeas Corpus' para verificar la legalidad de una detención?",
+        options: [
+          "El Ministro del Interior",
+          "El Comisario General de Seguridad Ciudadana",
+          "El Juez de Instrucción del lugar donde se halle la persona privada de libertad"
+        ],
+        correct: 2,
+        explanation: "Según la Ley Orgánica 6/1984, el procedimiento de Habeas Corpus se sustancia ante el Juez de Instrucción competente."
+      }
+    ];
+
+    let topics = JSON.parse(localStorage.getItem('cnp_topics') || JSON.stringify(DEFAULT_TOPICS));
+    let cards = JSON.parse(localStorage.getItem('cnp_cards') || JSON.stringify(DEFAULT_CARDS));
+    let reviewedCount = parseInt(localStorage.getItem('cnp_reviewed_count') || '0', 10);
+    let currentCardIdx = 0;
+    let showingAnswer = false;
+
+    // Estado del examen
+    let examState = {
+      active: false,
+      currentIndex: 0,
+      answered: false,
+      scoreCorrect: 0,
+      scoreWrong: 0,
+      userAnswers: []
+    };
+
+    function updateStatsDisplay() {
+      const statsElem = document.getElementById('user-stats');
+      if (statsElem) {
+        statsElem.innerText = `${reviewedCount} tarj. repasadas`;
+      }
+    }
+
+    function switchTab(tab, ev) {
+      document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('main > section').forEach(s => s.classList.add('hidden'));
+      
+      if(tab === 'temario') {
+        document.getElementById('view-temario').classList.remove('hidden');
+        renderTopics();
+      } else if(tab === 'cards') {
+        document.getElementById('view-cards').classList.remove('hidden');
+        renderFlashcard();
+      } else if(tab === 'exam') {
+        document.getElementById('view-exam').classList.remove('hidden');
+      }
+      
+      const targetBtn = ev ? ev.currentTarget : document.querySelector(`.nav-item[onclick*="${tab}"]`);
+      if (targetBtn) {
+        targetBtn.classList.add('active');
+      }
+      refreshIcons();
+    }
+
+    // --- TEMARIO ---
+    function saveTopic() {
+      const titleInput = document.getElementById('topic-title');
+      const fileInput = document.getElementById('file-input');
+      const title = titleInput.value.trim();
+      const file = fileInput.files[0];
+      if(!title) return alert('Por favor, introduce el título del tema');
+
+      topics.push({ 
+        id: Date.now(), 
+        title, 
+        fileName: file ? file.name : 'Documento de texto / Nota' 
+      });
+      localStorage.setItem('cnp_topics', JSON.stringify(topics));
+      titleInput.value = '';
+      fileInput.value = '';
+      renderTopics();
+    }
+
+    function deleteTopic(id) {
+      topics = topics.filter(t => t.id !== id);
+      localStorage.setItem('cnp_topics', JSON.stringify(topics));
+      renderTopics();
+    }
+
+    function renderTopics() {
+      const list = document.getElementById('topics-list');
+      if (topics.length === 0) {
+        list.innerHTML = '<p style="color:var(--text-muted); font-size: 0.9rem; padding: 12px;">No hay temas añadidos aún. Puedes subir un documento o crear uno arriba.</p>';
+        return;
+      }
+
+      list.innerHTML = topics.map(t => `
+        <div class="topic-item">
+          <div>
+            <h4 style="font-size: 0.95rem; margin-bottom: 4px; color: var(--text-dark);">${t.title}</h4>
+            <p style="font-size:0.8rem; color:var(--text-muted); display:flex; align-items:center; gap:4px;">
+              <i data-lucide="file-text" style="width:14px; height:14px;"></i> ${t.fileName}
+            </p>
+          </div>
+          <button class="delete-btn" title="Eliminar tema" onclick="deleteTopic(${t.id})">
+            <i data-lucide="trash-2" style="width:18px; height:18px;"></i>
+          </button>
+        </div>
+      `).join('');
+      refreshIcons();
+    }
+
+    // --- FLASHCARDS (Repetición Espaciada adaptada TDAH) ---
+    function addFlashcard() {
+      const q = document.getElementById('fc-q').value.trim();
+      const a = document.getElementById('fc-a').value.trim();
+      if(!q || !a) return alert('Por favor, rellena tanto la pregunta como la respuesta');
+      cards.push({ id: Date.now(), q, a, interval: 1 });
+      localStorage.setItem('cnp_cards', JSON.stringify(cards));
+      document.getElementById('fc-q').value = '';
+      document.getElementById('fc-a').value = '';
+      renderFlashcard();
+    }
+
+    function renderFlashcard() {
+      const container = document.getElementById('flashcard-container');
+      if(cards.length === 0) {
+        container.classList.add('hidden');
+        return;
+      }
+      container.classList.remove('hidden');
+      showingAnswer = false;
+
+      if (currentCardIdx >= cards.length) {
+        currentCardIdx = 0;
+      }
+
+      const card = cards[currentCardIdx];
+      document.getElementById('card-counter').innerText = `Tarjeta ${currentCardIdx + 1} de ${cards.length}`;
+      document.getElementById('card-interval-badge').innerText = `Intervalo: ${card.interval || 1} d.`;
+      document.getElementById('fc-content').innerText = card.q;
+      document.getElementById('fc-controls').classList.add('hidden');
+      refreshIcons();
+    }
+
+    function flipCard() {
+      if(cards.length === 0) return;
+      showingAnswer = !showingAnswer;
+      const card = cards[currentCardIdx];
+      document.getElementById('fc-content').innerText = showingAnswer ? card.a : card.q;
+      document.getElementById('fc-controls').classList.toggle('hidden', !showingAnswer);
+    }
+
+    function gradeCard(grade) {
+      if(cards.length === 0) return;
+      const current = cards[currentCardIdx];
+      
+      // Algoritmo de repetición espaciada simplificado
+      if (grade === 1) {
+        // Difícil: reiniciar intervalo a 1 día
+        current.interval = 1;
+      } else if (grade === 2) {
+        // Bien: incrementar progresivamente
+        current.interval = Math.round((current.interval || 1) * 1.5) + 1;
+      } else if (grade === 3) {
+        // Fácil: espaciar a largo plazo
+        current.interval = Math.round((current.interval || 1) * 2.5) + 2;
+      }
+
+      reviewedCount++;
+      localStorage.setItem('cnp_reviewed_count', reviewedCount.toString());
+      localStorage.setItem('cnp_cards', JSON.stringify(cards));
+      updateStatsDisplay();
+
+      // Avanzar a la siguiente tarjeta
+      currentCardIdx = (currentCardIdx + 1) % cards.length;
+      renderFlashcard();
+    }
+
+    // --- MÓDULO EXAMEN OFICIAL CNP ---
+    function startExam() {
+      examState = {
+        active: true,
+        currentIndex: 0,
+        answered: false,
+        scoreCorrect: 0,
+        scoreWrong: 0,
+        userAnswers: []
+      };
+
+      document.getElementById('exam-setup').classList.add('hidden');
+      const examContainer = document.getElementById('exam-container');
+      examContainer.classList.remove('hidden');
+      renderExamQuestion();
+    }
+
+    function renderExamQuestion() {
+      const examContainer = document.getElementById('exam-container');
+      const q = OFFICIAL_QUESTIONS[examState.currentIndex];
+      const total = OFFICIAL_QUESTIONS.length;
+      const netScore = Math.max(0, (examState.scoreCorrect - (examState.scoreWrong * 0.5))).toFixed(2);
+
+      examContainer.innerHTML = `
+        <div style="display: flex; justify-content: space-between; margin-bottom: 12px; gap: 6px;">
+          <div class="exam-stat-pill">Pregunta <b>${examState.currentIndex + 1}/${total}</b></div>
+          <div class="exam-stat-pill" style="color: var(--correct);">Aciertos: <b>${examState.scoreCorrect}</b></div>
+          <div class="exam-stat-pill" style="color: var(--wrong);">Fallos: <b>${examState.scoreWrong} (-0.5)</b></div>
+          <div class="exam-stat-pill" style="color: var(--accent-secondary);">Nota: <b>${netScore}</b></div>
+        </div>
+
+        <div class="card" style="background: white; border: 2px solid var(--border-color);">
+          <p style="font-size: 1rem; font-weight: 700; line-height: 1.45; color: var(--text-dark); margin-bottom: 16px;">
+            ${q.question}
+          </p>
+
+          <div id="options-group">
+            ${q.options.map((opt, idx) => `
+              <button class="option-btn" id="opt-btn-${idx}" onclick="selectAnswer(${idx})">
+                <b>${String.fromCharCode(65 + idx)})</b> ${opt}
+              </button>
+            `).join('')}
+          </div>
+
+          <div id="explanation-box" class="hidden" style="margin-top: 14px; padding: 12px; background: var(--bg-main); border-radius: var(--radius-md); font-size: 0.85rem; color: var(--text-dark);">
+            <div style="font-weight: 700; margin-bottom: 4px;">Justificación jurídica:</div>
+            <div>${q.explanation}</div>
+          </div>
+        </div>
+
+        <div id="exam-actions" style="margin-top: 12px;"></div>
+      `;
+      examState.answered = false;
+      refreshIcons();
+    }
+
+    function selectAnswer(selectedIndex) {
+      if (examState.answered) return;
+      examState.answered = true;
+
+      const q = OFFICIAL_QUESTIONS[examState.currentIndex];
+      const isCorrect = (selectedIndex === q.correct);
+
+      if (isCorrect) {
+        examState.scoreCorrect++;
+        document.getElementById(`opt-btn-${selectedIndex}`).classList.add('selected-correct');
+      } else {
+        examState.scoreWrong++;
+        document.getElementById(`opt-btn-${selectedIndex}`).classList.add('selected-wrong');
+        document.getElementById(`opt-btn-${q.correct}`).classList.add('selected-correct');
+      }
+
+      // Mostrar explicación
+      const expBox = document.getElementById('explanation-box');
+      if (expBox) expBox.classList.remove('hidden');
+
+      // Botón siguiente o ver resultados
+      const actions = document.getElementById('exam-actions');
+      const isLast = (examState.currentIndex === OFFICIAL_QUESTIONS.length - 1);
+
+      actions.innerHTML = `
+        <button class="btn" onclick="${isLast ? 'showExamResults()' : 'nextExamQuestion()'}">
+          <i data-lucide="${isLast ? 'check-circle' : 'arrow-right'}"></i>
+          ${isLast ? 'Ver Resultados Finales' : 'Siguiente Pregunta'}
+        </button>
+      `;
+      refreshIcons();
+    }
+
+    function nextExamQuestion() {
+      examState.currentIndex++;
+      renderExamQuestion();
+    }
+
+    function showExamResults() {
+      const total = OFFICIAL_QUESTIONS.length;
+      const netScore = Math.max(0, (examState.scoreCorrect - (examState.scoreWrong * 0.5)));
+      const grade10 = ((netScore / total) * 10).toFixed(2);
+      const isPass = (parseFloat(grade10) >= 5.0);
+
+      const examContainer = document.getElementById('exam-container');
+      examContainer.innerHTML = `
+        <div class="card" style="text-align: center; padding: 24px;">
+          <h3 style="font-size: 1.4rem; margin-bottom: 8px;">Resultados del Simulacro</h3>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 18px;">
+            Fórmula oficial: Aciertos - (Errores ÷ 2)
+          </p>
+
+          <div style="font-size: 2.4rem; font-weight: 800; color: ${isPass ? 'var(--correct)' : 'var(--wrong)'}; margin-bottom: 12px;">
+            ${grade10} <span style="font-size: 1.1rem; color: var(--text-muted);">/ 10</span>
+          </div>
+
+          <p style="font-weight: 700; margin-bottom: 18px; color: ${isPass ? 'var(--correct)' : 'var(--wrong)'};">
+            ${isPass ? '¡APROBADO! Excelente constancia para tu oposición' : 'NO APTO. Repasa los artículos clave en Flashcards'}
+          </p>
+
+          <div style="display: flex; justify-content: space-around; background: white; padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color); margin-bottom: 20px;">
+            <div>
+              <div style="font-size: 1.1rem; font-weight: 700; color: var(--correct);">${examState.scoreCorrect}</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">Aciertos</div>
+            </div>
+            <div>
+              <div style="font-size: 1.1rem; font-weight: 700; color: var(--wrong);">${examState.scoreWrong}</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">Errores (-${(examState.scoreWrong * 0.5).toFixed(1)})</div>
+            </div>
+            <div>
+              <div style="font-size: 1.1rem; font-weight: 700; color: var(--accent-secondary);">${netScore.toFixed(2)}</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">Puntos Netos</div>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <button class="btn" onclick="startExam()"><i data-lucide="rotate-ccw"></i> Repetir Simulacro</button>
+            <button class="btn" style="background: white; color: var(--text-dark); border: 1px solid var(--border-color);" onclick="exitExam()"><i data-lucide="home"></i> Volver al Inicio</button>
+          </div>
+        </div>
+      `;
+      refreshIcons();
+    }
+
+    function exitExam() {
+      document.getElementById('exam-container').classList.add('hidden');
+      document.getElementById('exam-setup').classList.remove('hidden');
+    }
+
+    // Registro de Service Worker para capacidades PWA Offline
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(reg => console.log('Service Worker registrado:', reg.scope))
+          .catch(err => console.log('Error al registrar Service Worker:', err));
+      });
+    }
+
+    // Inicialización al arrancar
+    updateStatsDisplay();
+    renderTopics();
+    refreshIcons();
+  </script>
+</body>
+</html>
