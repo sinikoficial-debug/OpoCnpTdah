@@ -1,4 +1,4 @@
-const CACHE_NAME = 'opocnp-tdah-v1';
+const CACHE_NAME = 'opocnp-tdah-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -35,7 +35,6 @@ self.addEventListener('fetch', (event) => {
         return cachedResponse;
       }
       return fetch(event.request).catch(() => {
-        // Fallback to cache index if document navigation
         if (event.request.mode === 'navigate') {
           return caches.match('./index.html');
         }
